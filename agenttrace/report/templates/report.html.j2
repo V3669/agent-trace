@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentTrace Report — {{ report.session_id }}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; background: #fafafa; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+  .headline { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .big-number { font-size: 3rem; font-weight: bold; color: {% if report.avoidable_pct > 20 %}#dc2626{% elif report.avoidable_pct > 10 %}#d97706{% else %}#16a34a{% endif %}; }
+  .metric-row { display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap; }
+  .metric { flex: 1; min-width: 150px; }
+  .metric-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric-value { font-size: 1.25rem; font-weight: 600; margin-top: 0.25rem; }
+  .section { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .section h2 { font-size: 1rem; margin: 0 0 1rem; }
+  .bar-chart { display: flex; flex-direction: column; gap: 0.5rem; }
+  .bar-row { display: flex; align-items: center; gap: 0.75rem; }
+  .bar-label { width: 120px; font-size: 0.85rem; color: #555; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; background: #f0f0f0; border-radius: 4px; height: 20px; }
+  .bar-fill { height: 100%; border-radius: 4px; background: #3b82f6; }
+  .bar-fill.waste { background: #ef4444; }
+  .bar-value { width: 70px; font-size: 0.8rem; color: #555; }
+  .methodology { margin-top: 2rem; font-size: 0.75rem; color: #888; border-top: 1px solid #e0e0e0; padding-top: 1rem; }
+  code { background: #f4f4f4; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<h1>AgentTrace Session Report</h1>
+<p class="subtitle">Session: <code>{{ report.session_id }}</code></p>
+
+<div class="headline">
+  <div class="big-number">{{ "%.1f"|format(report.avoidable_pct) }}%</div>
+  <div style="color:#555;margin-top:0.25rem">of billed input tokens were spent re-reading unchanged files</div>
+  <div class="metric-row">
+    <div class="metric">
+      <div class="metric-label">Total Billed Input Cost</div>
+      <div class="metric-value">${{ "%.4f"|format(report.total_billed_input_cost) }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Wasted Cost</div>
+      <div class="metric-value" style="color:#ef4444">${{ "%.4f"|format(report.wasted_cost) }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total Requests</div>
+      <div class="metric-value">{{ report.total_requests }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Re-read Files</div>
+      <div class="metric-value">{{ report.wasted_requests }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Cost Breakdown</h2>
+  <div class="bar-chart">
+    <div class="bar-row">
+      <div class="bar-label">Total Input</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:100%"></div>
+      </div>
+      <div class="bar-value">${{ "%.4f"|format(report.total_billed_input_cost) }}</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Wasted (re-reads)</div>
+      <div class="bar-track">
+        {% set waste_pct = (report.wasted_cost / report.total_billed_input_cost * 100) if report.total_billed_input_cost > 0 else 0 %}
+        <div class="bar-fill waste" style="width:{{ waste_pct }}%"></div>
+      </div>
+      <div class="bar-value">${{ "%.4f"|format(report.wasted_cost) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="methodology">
+  <strong>Methodology:</strong>
+  Waste = re-read file payloads (identical path + content hash within session), costed at cache-read rate.
+  <code>avoidable_pct = (W_reread) / B_input × 100</code>.
+  Conservative lower bound — only provably identical, re-sent content counts.
+  Provider-reported usage is authoritative; tiktoken estimates (if shown) are labeled low-confidence.
+</div>
+</body>
+</html>

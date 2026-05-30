@@ -1,0 +1,57 @@
+# Pricing seeded from LiteLLM model_prices_and_context_window dataset.
+# Attribution: https://github.com/BerriAI/litellm
+# All prices in USD per token.
+
+[[model]]
+id = "claude-opus-4-8"
+provider = "anthropic"
+price_input = 0.000015
+price_output = 0.000075
+price_cache_read = 0.0000015
+price_cache_write = 0.00001875
+as_of = "2026-05-01"
+
+[[model]]
+id = "claude-opus-4-7"
+provider = "anthropic"
+price_input = 0.000015
+price_output = 0.000075
+price_cache_read = 0.0000015
+price_cache_write = 0.00001875
+as_of = "2026-05-01"
+
+[[model]]
+id = "claude-sonnet-4-6"
+provider = "anthropic"
+price_input = 0.000003
+price_output = 0.000015
+price_cache_read = 0.0000003
+price_cache_write = 0.00000375
+as_of = "2026-05-01"
+
+[[model]]
+id = "claude-haiku-4-5-20251001"
+provider = "anthropic"
+price_input = 0.0000008
+price_output = 0.000004
+price_cache_read = 0.00000008
+price_cache_write = 0.000001
+as_of = "2026-05-01"
+
+[[model]]
+id = "gpt-4o"
+provider = "openai"
+price_input = 0.0000025
+price_output = 0.00001
+price_cache_read = 0.00000125
+price_cache_write = 0.0
+as_of = "2026-05-01"
+
+[[model]]
+id = "gpt-4o-mini"
+provider = "openai"
+price_input = 0.00000015
+price_output = 0.0000006
+price_cache_read = 0.000000075
+price_cache_write = 0.0
+as_of = "2026-05-01"

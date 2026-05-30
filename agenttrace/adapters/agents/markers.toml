@@ -1,0 +1,10 @@
+# Agent detection markers — matched case-insensitively against User-Agent header.
+# If no marker matches → agent=unknown (provider metrics only, no waste attribution).
+
+[[agent]]
+id = "claude_code"
+ua_prefix = "claude-cli/"
+
+[[agent]]
+id = "aider"
+ua_contains = "aider"
