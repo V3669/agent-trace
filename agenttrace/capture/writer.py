@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from typing import TYPE_CHECKING
 
 import structlog
 
 from agenttrace.models import CaptureEvent
-
-if TYPE_CHECKING:
-    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -58,7 +54,7 @@ async def writer_task(queue: asyncio.Queue[CaptureEvent], conn: sqlite3.Connecti
                         "system_prompt_hash": event.system_prompt_hash,
                         "message_hashes_json": event.message_hashes_json,
                         "tool_defs_hash": event.tool_defs_hash,
-                        "body_blob": event.body_blob if True else None,
+                        "body_blob": event.body_blob,
                         "usage_input": usage.input_tokens if usage else None,
                         "usage_output": usage.output_tokens if usage else None,
                         "cache_read_input": usage.cache_read_input_tokens if usage else None,

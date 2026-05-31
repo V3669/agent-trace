@@ -33,7 +33,7 @@ def _print_setup_snippets(port: int) -> None:
     typer.echo("  # Then run Claude Code as normal\n")
     typer.echo("── Aider ────────────────────────────────────────────────")
     typer.echo(f"  aider --openai-api-base http://127.0.0.1:{port}/v1")
-    typer.echo("  # Or: export OPENAI_API_BASE=http://127.0.0.1:{port}/v1\n")
+    typer.echo(f"  # Or: export OPENAI_API_BASE=http://127.0.0.1:{port}/v1\n")
     typer.echo("Press Ctrl+C to stop.\n")
 
 

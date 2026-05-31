@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import Union
-
 import structlog
 
 logger = structlog.get_logger(__name__)
 
-_encoder: Union["object", None] = None  # tiktoken.Encoding | False | None
+_encoder: object | None = None  # tiktoken.Encoding | None
 _encoder_initialized = False
 
 

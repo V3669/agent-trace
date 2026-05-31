@@ -63,3 +63,16 @@ warn_unreachable = true
 asyncio_mode = "auto"
 addopts = "-ra"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["agenttrace"]
+branch = true
+
+[tool.coverage.report]
+# CLI/presentation layer tested via e2e/manual; coverage gate targets core modules.
+omit = [
+    "agenttrace/cli.py",
+    "agenttrace/report/renderer.py",
+    "agenttrace/webui/*",
+]
+fail_under = 85

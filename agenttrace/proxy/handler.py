@@ -24,7 +24,7 @@ from agenttrace.adapters.providers.detection import detect_provider
 from agenttrace.analysis.hashing import canonical_hash, sha256_hex
 from agenttrace.capture.channel import enqueue
 from agenttrace.config import settings
-from agenttrace.models import AgentId, CaptureEvent, Provider, Usage
+from agenttrace.models import AgentId, CanonicalRequest, CaptureEvent, Provider, Usage
 
 logger = structlog.get_logger(__name__)
 
@@ -60,13 +60,8 @@ def _build_upstream_headers(request_headers: Headers) -> dict[str, str]:
     return result
 
 
-async def _tee_stream(
-    source: AsyncIterator[bytes],
-    capture_buf: list[bytes],
-) -> AsyncIterator[bytes]:
-    async for chunk in source:
-        capture_buf.append(chunk)
-        yield chunk
+def _strip_hop_by_hop(headers: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP}
 
 
 def _parse_sse_frames(raw_bytes: bytes) -> list[dict[str, Any]]:
@@ -80,7 +75,7 @@ def _parse_sse_frames(raw_bytes: bytes) -> list[dict[str, Any]]:
     return frames
 
 
-def _compute_message_hashes(canonical: Any) -> str:
+def _compute_message_hashes(canonical: CanonicalRequest) -> str:
     hashes = [
         sha256_hex(
             json.dumps(
@@ -108,7 +103,11 @@ async def proxy_handler(
     user_agent = headers_dict.get("user-agent", "")
     agent_id = detect_agent(user_agent)
 
-    upstream_base = _UPSTREAM_MAP.get(provider, settings.upstream_anthropic)
+    upstream_base = _UPSTREAM_MAP.get(provider)
+    if upstream_base is None:
+        logger.warning("proxy.unknown_provider", provider=provider, conn_id=conn_id)
+        upstream_base = settings.upstream_anthropic
+
     upstream_url = upstream_base.rstrip("/") + str(request.url.path)
     if request.url.query:
         upstream_url += f"?{request.url.query}"
@@ -116,62 +115,79 @@ async def proxy_handler(
     upstream_headers = _build_upstream_headers(request.headers)
     body_bytes = await request.body()
 
-    capture_buf: list[bytes] = []
+    # Build the upstream request; send with stream=True so we control when the
+    # connection is closed rather than letting a context manager close it early.
+    upstream_request = http_client.build_request(
+        method=request.method,
+        url=upstream_url,
+        headers=upstream_headers,
+        content=body_bytes,
+    )
 
     try:
-        async with http_client.stream(
-            method=request.method,
-            url=upstream_url,
-            headers=upstream_headers,
-            content=body_bytes,
-        ) as upstream_resp:
-            resp_headers = dict(upstream_resp.headers)
-            for h in list(resp_headers.keys()):
-                if h.lower() in _HOP_BY_HOP:
-                    del resp_headers[h]
-
-            content_type = resp_headers.get("content-type", "")
-            is_streaming = "text/event-stream" in content_type
-
-            async def streamed_body() -> AsyncIterator[bytes]:
-                async for chunk in _tee_stream(upstream_resp.aiter_raw(), capture_buf):
-                    yield chunk
-
-            response: Response
-            if is_streaming:
-                response = StreamingResponse(
-                    streamed_body(),
-                    status_code=upstream_resp.status_code,
-                    headers=resp_headers,
-                )
-            else:
-                raw_body = await upstream_resp.aread()
-                capture_buf.append(raw_body)
-                response = Response(
-                    content=raw_body,
-                    status_code=upstream_resp.status_code,
-                    headers=resp_headers,
-                )
-
+        upstream_resp = await http_client.send(upstream_request, stream=True)
     except Exception:
         logger.exception("proxy.upstream_error", conn_id=conn_id)
         return Response(content=b"Bad Gateway", status_code=502)
 
-    # Schedule capture (fail-open: errors here must never surface to caller)
-    asyncio.create_task(
-        _do_capture(
-            recv_ts=recv_ts,
-            conn_id=conn_id,
-            agent_id=agent_id,
-            provider=provider,
-            body_bytes=body_bytes,
-            capture_buf=capture_buf,
-            capture_queue=capture_queue,
-            is_streaming=is_streaming,
-        )
-    )
+    resp_headers = _strip_hop_by_hop(dict(upstream_resp.headers))
+    content_type = resp_headers.get("content-type", "")
+    is_streaming = "text/event-stream" in content_type
+    capture_buf: list[bytes] = []
 
-    return response
+    if is_streaming:
+        async def _streaming_body() -> AsyncIterator[bytes]:
+            try:
+                async for chunk in upstream_resp.aiter_raw():
+                    capture_buf.append(chunk)
+                    yield chunk
+            finally:
+                await upstream_resp.aclose()
+                # Schedule capture only after stream is fully consumed (or closed
+                # early by client disconnect) so capture_buf is complete.
+                asyncio.create_task(
+                    _do_capture(
+                        recv_ts=recv_ts,
+                        conn_id=conn_id,
+                        agent_id=agent_id,
+                        provider=provider,
+                        body_bytes=body_bytes,
+                        capture_buf=capture_buf,
+                        capture_queue=capture_queue,
+                        is_streaming=True,
+                    )
+                )
+
+        return StreamingResponse(
+            _streaming_body(),
+            status_code=upstream_resp.status_code,
+            headers=resp_headers,
+        )
+    else:
+        try:
+            raw_body = await upstream_resp.aread()
+            capture_buf.append(raw_body)
+        finally:
+            await upstream_resp.aclose()
+
+        asyncio.create_task(
+            _do_capture(
+                recv_ts=recv_ts,
+                conn_id=conn_id,
+                agent_id=agent_id,
+                provider=provider,
+                body_bytes=body_bytes,
+                capture_buf=capture_buf,
+                capture_queue=capture_queue,
+                is_streaming=False,
+            )
+        )
+
+        return Response(
+            content=raw_body,
+            status_code=upstream_resp.status_code,
+            headers=resp_headers,
+        )
 
 
 async def _do_capture(

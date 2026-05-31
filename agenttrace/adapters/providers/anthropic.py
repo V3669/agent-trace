@@ -61,19 +61,46 @@ def parse_usage_from_response(response_body: bytes) -> Usage | None:
 
 
 def parse_usage_from_stream_frames(frames: list[dict[str, Any]]) -> Usage:
-    for frame in reversed(frames):
-        if frame.get("type") in ("message_delta", "message_stop"):
+    # Anthropic splits usage across frames:
+    #   message_start  → input_tokens + cache fields
+    #   message_delta  → output_tokens
+    # Accumulate across all frames; later frames override earlier for the same field.
+    input_tokens = 0
+    output_tokens = 0
+    cache_read = 0
+    cache_creation = 0
+    found_any = False
+
+    for frame in frames:
+        frame_type = frame.get("type")
+        usage_data: dict[str, Any] = {}
+        if frame_type == "message_start":
+            msg = frame.get("message", {})
+            usage_data = msg.get("usage", {})
+        elif frame_type in ("message_delta", "message_stop"):
             usage_data = frame.get("usage", {})
-            if usage_data:
-                return Usage(
-                    input_tokens=usage_data.get("input_tokens", 0),
-                    output_tokens=usage_data.get("output_tokens", 0),
-                    cache_read_input_tokens=usage_data.get("cache_read_input_tokens", 0),
-                    cache_creation_input_tokens=usage_data.get("cache_creation_input_tokens", 0),
-                    usage_source=UsageSource.reported,
-                )
-    # stream ended without usage frame
-    return Usage(usage_source=UsageSource.partial, estimate_confidence=EstimateConfidence.low)
+
+        if usage_data:
+            found_any = True
+            if "input_tokens" in usage_data:
+                input_tokens = usage_data["input_tokens"]
+            if "output_tokens" in usage_data:
+                output_tokens = usage_data["output_tokens"]
+            if "cache_read_input_tokens" in usage_data:
+                cache_read = usage_data["cache_read_input_tokens"]
+            if "cache_creation_input_tokens" in usage_data:
+                cache_creation = usage_data["cache_creation_input_tokens"]
+
+    if not found_any:
+        return Usage(usage_source=UsageSource.partial, estimate_confidence=EstimateConfidence.low)
+
+    return Usage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=cache_creation,
+        usage_source=UsageSource.reported,
+    )
 
 
 def _extract_usage(data: dict[str, Any]) -> Usage | None:
