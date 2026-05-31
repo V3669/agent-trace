@@ -1,29 +1,31 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# ── Packaging / distribution ──────────────────────────────────────────────────
 *.egg
 *.egg-info/
 dist/
 build/
-eggs/
-parts/
-var/
-sdist/
 wheels/
 *.egg-link
 MANIFEST
 
-# Virtual envs
+# ── Virtual environments ──────────────────────────────────────────────────────
 .venv/
 venv/
 env/
+
+# ── Environment / secrets (belt-and-suspenders; credentials must never land) ──
 .env
 .env.*
 !.env.example
+.env.local
+secrets.toml
 
-# Coverage / test artifacts
+# ── Test & coverage artifacts ─────────────────────────────────────────────────
 .coverage
 .coverage.*
 coverage.xml
@@ -32,40 +34,36 @@ htmlcov/
 .pytest_cache/
 .hypothesis/
 
-# Type checker
+# ── Type checker / linter caches ──────────────────────────────────────────────
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Ruff
 .ruff_cache/
 
-# Build / packaging
-*.whl
-*.tar.gz
+# ── Node / webui (P1 React SPA) ───────────────────────────────────────────────
+node_modules/
+webui/dist/
+webui/.vite/
+*.local
 
-# IDE
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# OS
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# AgentTrace runtime data
+# ── AgentTrace runtime files (generated, not source) ─────────────────────────
 *.db
 *.db-wal
 *.db-shm
-~/.agenttrace/
-
-# Reports (generated output, not source)
 report.html
 agenttrace_s_*.json
 agenttrace_s_*.md
 
-# Secrets — should never be here, but belt-and-suspenders
-.env.local
-secrets.toml
+.claude/
