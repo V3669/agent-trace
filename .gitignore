@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+*.egg-link
+MANIFEST
+
+# Virtual envs
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Coverage / test artifacts
+.coverage
+.coverage.*
+coverage.xml
+coverage/
+htmlcov/
+.pytest_cache/
+.hypothesis/
+
+# Type checker
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Build / packaging
+*.whl
+*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AgentTrace runtime data
+*.db
+*.db-wal
+*.db-shm
+~/.agenttrace/
+
+# Reports (generated output, not source)
+report.html
+agenttrace_s_*.json
+agenttrace_s_*.md
+
+# Secrets — should never be here, but belt-and-suspenders
+.env.local
+secrets.toml
