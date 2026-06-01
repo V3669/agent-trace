@@ -20,12 +20,8 @@ from agenttrace.tokens.estimator import estimate_tokens
 logger = structlog.get_logger(__name__)
 
 # Aider tool-name sets (lowercased).
-_FILE_READ_TOOLS = frozenset(
-    {"read_file", "view_file", "read", "view", "cat", "get_file_content"}
-)
-_GLOB_TOOLS = frozenset(
-    {"list_dir", "find_files", "glob", "grep", "ls", "search_files"}
-)
+_FILE_READ_TOOLS = frozenset({"read_file", "view_file", "read", "view", "cat", "get_file_content"})
+_GLOB_TOOLS = frozenset({"list_dir", "find_files", "glob", "grep", "ls", "search_files"})
 _EDIT_TOOLS = frozenset(
     {
         "write_file",
@@ -157,7 +153,5 @@ def _flatten_content(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return " ".join(
-            block.get("text", "") for block in content if isinstance(block, dict)
-        )
+        return " ".join(block.get("text", "") for block in content if isinstance(block, dict))
     return ""

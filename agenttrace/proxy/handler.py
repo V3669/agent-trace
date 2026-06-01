@@ -159,6 +159,7 @@ async def proxy_handler(
     capture_buf: list[bytes] = []
 
     if is_streaming:
+
         async def _streaming_body() -> AsyncIterator[bytes]:
             try:
                 async for chunk in upstream_resp.aiter_raw():

@@ -12,16 +12,12 @@ from tests.conftest import (
 
 
 class TestRankTurns:
-    def test_empty_session_returns_empty(
-        self, tmp_db: tuple[Path, object]
-    ) -> None:
+    def test_empty_session_returns_empty(self, tmp_db: tuple[Path, object]) -> None:
         db_path, _ = tmp_db
         result = rank_turns(db_path, "no-session")
         assert result == []
 
-    def test_single_request_rank_one(
-        self, tmp_db: tuple[Path, object]
-    ) -> None:
+    def test_single_request_rank_one(self, tmp_db: tuple[Path, object]) -> None:
         db_path, conn = tmp_db
         r1 = _insert_request(
             conn, recv_ts="2026-01-01T00:00:01Z", usage_input=1000, usage_output=100
@@ -32,14 +28,10 @@ class TestRankTurns:
         assert len(turns) == 1
         assert turns[0].rank == 1
 
-    def test_higher_cost_turn_ranked_first(
-        self, tmp_db: tuple[Path, object]
-    ) -> None:
+    def test_higher_cost_turn_ranked_first(self, tmp_db: tuple[Path, object]) -> None:
         db_path, conn = tmp_db
         # r1 is cheaper, r2 is more expensive
-        r1 = _insert_request(
-            conn, recv_ts="2026-01-01T00:00:01Z", usage_input=100, usage_output=10
-        )
+        r1 = _insert_request(conn, recv_ts="2026-01-01T00:00:01Z", usage_input=100, usage_output=10)
         r2 = _insert_request(
             conn, recv_ts="2026-01-01T00:00:02Z", usage_input=5000, usage_output=500
         )
@@ -52,9 +44,7 @@ class TestRankTurns:
         assert turns[1].request_id == r1
         assert turns[1].rank == 2
 
-    def test_limit_respected(
-        self, tmp_db: tuple[Path, object]
-    ) -> None:
+    def test_limit_respected(self, tmp_db: tuple[Path, object]) -> None:
         db_path, conn = tmp_db
         reqs = []
         for i in range(10):
@@ -74,18 +64,14 @@ class TestRankTurns:
         turns = rank_turns(db_path, "sess-limit", limit=3)
         assert len(turns) == 3
 
-    def test_reread_cause_label(
-        self, session_with_rerereads: tuple[Path, str]
-    ) -> None:
+    def test_reread_cause_label(self, session_with_rerereads: tuple[Path, str]) -> None:
         db_path, session_id = session_with_rerereads
         turns = rank_turns(db_path, session_id)
         # The requests that contain the re-read file should be labelled.
         reread_turns = [t for t in turns if t.cause_label == "re-read"]
         assert len(reread_turns) >= 1
 
-    def test_all_ranks_unique(
-        self, tmp_db: tuple[Path, object]
-    ) -> None:
+    def test_all_ranks_unique(self, tmp_db: tuple[Path, object]) -> None:
         db_path, conn = tmp_db
         for i in range(5):
             r = _insert_request(
@@ -104,9 +90,7 @@ class TestRankTurns:
         ranks = [t.rank for t in turns]
         assert len(ranks) == len(set(ranks))
 
-    def test_turn_cost_fields_non_negative(
-        self, session_with_rerereads: tuple[Path, str]
-    ) -> None:
+    def test_turn_cost_fields_non_negative(self, session_with_rerereads: tuple[Path, str]) -> None:
         db_path, session_id = session_with_rerereads
         for turn in rank_turns(db_path, session_id):
             assert turn.billed_input_cost >= 0.0

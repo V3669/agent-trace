@@ -108,9 +108,7 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
                 seen_paths.add(path)
 
         avoidable_pct = (
-            (wasted_cost / total_billed_input_cost * 100)
-            if total_billed_input_cost > 0
-            else 0.0
+            (wasted_cost / total_billed_input_cost * 100) if total_billed_input_cost > 0 else 0.0
         )
 
         count_row = duck.execute(

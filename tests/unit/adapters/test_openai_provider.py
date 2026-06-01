@@ -80,9 +80,7 @@ class TestNormalizeRequest:
         result = adapter.normalize_request(body)
         assert len(result.messages) == 1
         assert result.messages[0].role == "assistant"
-        tool_block = next(
-            b for b in result.messages[0].content if b.get("type") == "tool_calls"
-        )
+        tool_block = next(b for b in result.messages[0].content if b.get("type") == "tool_calls")
         assert tool_block["tool_calls"] == [tool_call]
 
     def test_tool_result_message_normalized(self) -> None:

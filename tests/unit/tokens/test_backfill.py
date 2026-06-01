@@ -72,9 +72,7 @@ class TestBackfillPartialTurns:
         count = backfill_partial_turns(mem_conn)
         assert count == 0
 
-    def test_multiple_partial_requests_all_backfilled(
-        self, mem_conn: sqlite3.Connection
-    ) -> None:
+    def test_multiple_partial_requests_all_backfilled(self, mem_conn: sqlite3.Connection) -> None:
         body = json.dumps({"messages": [{"role": "user", "content": "test"}]}).encode()
         for _ in range(3):
             _insert_request(
@@ -93,9 +91,7 @@ class TestBackfillPartialTurns:
 
 class TestEstimateFromBody:
     def test_string_content(self) -> None:
-        body = json.dumps(
-            {"messages": [{"role": "user", "content": "Hello world"}]}
-        ).encode()
+        body = json.dumps({"messages": [{"role": "user", "content": "Hello world"}]}).encode()
         tokens = _estimate_from_body(body)
         assert tokens > 0
 
@@ -120,9 +116,7 @@ class TestEstimateFromBody:
                 "messages": [{"role": "user", "content": "Hi"}],
             }
         ).encode()
-        body_without_system = json.dumps(
-            {"messages": [{"role": "user", "content": "Hi"}]}
-        ).encode()
+        body_without_system = json.dumps({"messages": [{"role": "user", "content": "Hi"}]}).encode()
         assert _estimate_from_body(body_with_system) > _estimate_from_body(body_without_system)
 
     def test_malformed_json_returns_zero(self) -> None:

@@ -59,9 +59,7 @@ def normalize_request(body: bytes) -> CanonicalRequest:
         if role == "assistant":
             tool_calls = m.get("tool_calls")
             if tool_calls:
-                content_blocks.append(
-                    {"type": "tool_calls", "tool_calls": tool_calls}
-                )
+                content_blocks.append({"type": "tool_calls", "tool_calls": tool_calls})
 
         # Tool results carry tool_call_id at the message level.
         if role == "tool":

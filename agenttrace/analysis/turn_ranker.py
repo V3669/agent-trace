@@ -160,10 +160,7 @@ def rank_turns(
 
     unranked.sort(key=lambda pair: pair[0], reverse=True)
 
-    return [
-        replace(turn, rank=i + 1)
-        for i, (_cost, turn) in enumerate(unranked[:limit])
-    ]
+    return [replace(turn, rank=i + 1) for i, (_cost, turn) in enumerate(unranked[:limit])]
 
 
 # ---------------------------------------------------------------------------

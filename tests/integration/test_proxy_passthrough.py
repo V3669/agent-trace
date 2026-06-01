@@ -67,20 +67,16 @@ _SSE_MSG_START = (
     '"output_tokens":0,"cache_read_input_tokens":5,"cache_creation_input_tokens":0}}}'
 )
 _SSE_CB_START = (
-    'data: {"type":"content_block_start","index":0,'
-    '"content_block":{"type":"text","text":""}}'
+    'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}'
 )
 _SSE_DELTA_1 = (
-    'data: {"type":"content_block_delta","index":0,'
-    '"delta":{"type":"text_delta","text":"Hello"}}'
+    'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}'
 )
 _SSE_DELTA_2 = (
-    'data: {"type":"content_block_delta","index":0,'
-    '"delta":{"type":"text_delta","text":" world"}}'
+    'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}'
 )
 _SSE_MSG_DELTA = (
-    'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},'
-    '"usage":{"output_tokens":4}}'
+    'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":4}}'
 )
 _FAKE_SSE_FRAMES = "\n".join(
     [
