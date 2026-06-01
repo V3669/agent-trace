@@ -53,5 +53,7 @@ def get_price(model_id: str, path: Path | None = None) -> ModelPrice | None:
     global _price_table
     if _price_table is None:
         load_prices(path)
-    assert _price_table is not None
+    # load_prices always sets _price_table; if it raises, the caller sees the exception.
+    if _price_table is None:  # pragma: no cover  (defensive: should never be reached)
+        return None
     return _price_table.get(model_id)
