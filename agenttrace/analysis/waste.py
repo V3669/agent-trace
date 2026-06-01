@@ -1,42 +1,54 @@
+"""DuckDB-based waste computation.
+
+Attaches the SQLite store read-only and computes the cache-net waste metrics
+defined in PLAN.md Appendix C.  All writes remain in SQLite; DuckDB is pure
+analytics.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
-import duckdb
 import structlog
 
-from agenttrace.models import WasteReport
+from agenttrace.analysis.queries import open_duckdb
+from agenttrace.models import SessionSummary, WasteReport
 from agenttrace.pricing.loader import get_price
 
 logger = structlog.get_logger(__name__)
 
-_DUCKDB_SETUP = """
-INSTALL sqlite;
-LOAD sqlite;
-"""
-
 
 def compute_waste(db_path: Path, session_id: str) -> WasteReport:
-    duck = duckdb.connect(":memory:")
-    try:
-        duck.execute(_DUCKDB_SETUP)
-        duck.execute(f"ATTACH '{db_path}' AS s (TYPE sqlite, READ_ONLY)")
+    """Compute waste metrics for a session using DuckDB over the SQLite store.
 
-        # Get all requests in session
+    Only requests with usage_source='reported' are included in the headline
+    reconciliation.  Partial/estimated turns are excluded from ±1% gate
+    (see PLAN.md §8.5).
+
+    Args:
+        db_path: Path to the SQLite store.
+        session_id: Session to analyse.
+
+    Returns:
+        WasteReport with billed cost, wasted cost, avoidable_pct, etc.
+    """
+    with open_duckdb(db_path) as duck:
+        # Fetch all reported requests in the session.
         requests = duck.execute(
             """
             SELECT
                 r.id,
                 r.model,
-                r.usage_input,
-                r.usage_output,
-                r.cache_read_input,
-                r.cache_creation_input,
+                COALESCE(r.usage_input, 0)          AS usage_input,
+                COALESCE(r.usage_output, 0)         AS usage_output,
+                COALESCE(r.cache_read_input, 0)     AS cache_read,
+                COALESCE(r.cache_creation_input, 0) AS cache_create,
                 r.usage_source
             FROM s.requests r
             JOIN s.session_events se ON se.request_id = r.id
             WHERE se.session_id = ?
-              AND r.usage_source IN ('reported')
+              AND r.usage_source = 'reported'
+            ORDER BY r.recv_ts
             """,
             [session_id],
         ).fetchall()
@@ -45,17 +57,11 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
         fixed_overhead_cost = 0.0
 
         for row in requests:
-            req_id, model, u_in, u_out, cache_read, cache_create, u_source = row
+            _req_id, model, u_in, _u_out, cache_read, cache_create, _source = row
             price = get_price(model or "") if model else None
-
             if price is None:
                 continue
-
-            u_in = u_in or 0
-            cache_read = cache_read or 0
-            cache_create = cache_create or 0
             plain_input = max(0, u_in - cache_read - cache_create)
-
             billed = (
                 plain_input * price.price_input
                 + cache_read * price.price_cache_read
@@ -63,14 +69,14 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
             )
             total_billed_input_cost += billed
 
-        # Re-read waste: file_read_events with same (path, content_hash) appearing >1 in session
+        # Re-read waste: identical (path, content_hash) appearing >1× in session.
         rerereads = duck.execute(
             """
             SELECT
                 fre.path,
                 fre.content_hash,
-                COUNT(*) as read_count,
-                SUM(fre.approx_tokens) as total_tokens,
+                COUNT(*)               AS read_count,
+                SUM(fre.approx_tokens) AS total_tokens,
                 r.model
             FROM s.file_read_events fre
             JOIN s.requests r ON r.id = fre.request_id
@@ -90,7 +96,11 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
             price = get_price(model or "") if model else None
             if price is None:
                 continue
-            # Re-reads cost at cache-read rate (conservative); subtract first read
+            # Re-reads billed at cache-read rate (conservative, per D7).
+            # Attribute only the *repeat* reads: total_tokens minus one share
+            # (the first, legitimate read).  Integer ceiling division ensures
+            # we err on the side of under-counting waste, not over-counting.
+            # For N reads: repeat_tokens = total − floor(total/N).
             repeat_tokens = total_tokens - (total_tokens // read_count)
             wasted_cost += repeat_tokens * price.price_cache_read
             if path not in seen_paths:
@@ -104,12 +114,10 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
         )
 
         count_row = duck.execute(
-            "SELECT COUNT(*) FROM s.session_events WHERE session_id = ?", [session_id]
+            "SELECT COUNT(*) FROM s.session_events WHERE session_id = ?",
+            [session_id],
         ).fetchone()
         total_requests: int = int(count_row[0]) if count_row else 0
-
-    finally:
-        duck.close()
 
     return WasteReport(
         session_id=session_id,
@@ -122,14 +130,58 @@ def compute_waste(db_path: Path, session_id: str) -> WasteReport:
     )
 
 
+def list_sessions(db_path: Path) -> list[SessionSummary]:
+    """Return a summary of all sessions in the store, newest first.
+
+    Args:
+        db_path: Path to the SQLite store.
+
+    Returns:
+        List of SessionSummary ordered by start_ts descending.
+    """
+    if not db_path.exists():
+        return []
+
+    with open_duckdb(db_path) as duck:
+        rows = duck.execute(
+            """
+            SELECT
+                se.session_id,
+                MIN(r.recv_ts)   AS start_ts,
+                MAX(r.recv_ts)   AS end_ts,
+                COUNT(r.id)      AS total_requests,
+                -- Use the most-frequent agent/provider as the session label.
+                MODE(r.agent_id)   AS agent_id,
+                MODE(r.provider)   AS provider
+            FROM s.session_events se
+            JOIN s.requests r ON r.id = se.request_id
+            GROUP BY se.session_id
+            ORDER BY start_ts DESC
+            """
+        ).fetchall()
+
+    summaries: list[SessionSummary] = []
+    for session_id, start_ts, end_ts, total_requests, agent_id, provider in rows:
+        summaries.append(
+            SessionSummary(
+                session_id=session_id,
+                start_ts=start_ts or "",
+                end_ts=end_ts or "",
+                total_requests=int(total_requests),
+                agent_id=agent_id or "unknown",
+                provider=provider or "unknown",
+            )
+        )
+    return summaries
+
+
 def get_latest_session_id(db_path: Path) -> str | None:
-    duck = duckdb.connect(":memory:")
-    try:
-        duck.execute(_DUCKDB_SETUP)
-        duck.execute(f"ATTACH '{db_path}' AS s (TYPE sqlite, READ_ONLY)")
+    """Return the session_id of the most recent session, or None if empty."""
+    if not db_path.exists():
+        return None
+
+    with open_duckdb(db_path) as duck:
         row = duck.execute(
             "SELECT session_id FROM s.session_events ORDER BY id DESC LIMIT 1"
         ).fetchone()
-    finally:
-        duck.close()
     return row[0] if row else None

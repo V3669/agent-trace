@@ -103,3 +103,14 @@ class WasteReport(BaseModel):
     fixed_overhead_cost: float
     total_requests: int
     wasted_requests: int
+
+
+class SessionSummary(BaseModel):
+    """Lightweight summary of a session for the sessions list endpoint."""
+
+    session_id: str
+    start_ts: str
+    end_ts: str
+    total_requests: int
+    agent_id: str
+    provider: str
